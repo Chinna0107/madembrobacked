@@ -77,13 +77,30 @@ router.get('/public/products', async (req, res) => {
   }
 });
 
+// Public orders by email (for guest users)
+router.get('/public/orders', async (req, res) => {
+  const { email } = req.query;
+  if (!email) return res.status(400).json({ message: 'Email required' });
+  try {
+    const orders = await sql`
+      SELECT * FROM orders
+      WHERE LOWER(customer_email) = LOWER(${email})
+      ORDER BY created_at DESC`;
+    res.json(orders);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // Dashboard stats
 router.get('/dashboard', adminAuth, async (req, res) => {
   try {
     const [{ count: users }] = await sql`SELECT COUNT(*) FROM users`;
     const [{ count: products }] = await sql`SELECT COUNT(*) FROM products`;
     const [{ count: banners }] = await sql`SELECT COUNT(*) FROM banners`;
-    res.json({ users: +users, products: +products, banners: +banners });
+    const [{ count: orders }] = await sql`SELECT COUNT(*) FROM orders`;
+    const [{ sum: revenue }] = await sql`SELECT COALESCE(SUM(total),0) AS sum FROM orders WHERE status != 'cancelled'`;
+    res.json({ users: +users, products: +products, banners: +banners, orders: +orders, revenue: +revenue });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
